@@ -19,7 +19,7 @@ if [ ${#images[@]} -eq 0 ]; then
 fi
 
 # 파일명 기준 정렬
-IFS=$'\n' images=($(sort <<<"${images[*]}")); unset IFS
+IFS=$'\n' images=($(sort -V <<<"${images[*]}")); unset IFS
 
 echo "합칠 이미지 ${#images[@]}개:"
 printf '  %s\n' "${images[@]}"
