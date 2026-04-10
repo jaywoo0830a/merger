@@ -1,8 +1,31 @@
 """이미지를 방향과 갭을 지정하여 합쳐주는 스크립트"""
 
 import argparse
+import re
 from pathlib import Path
 from PIL import Image
+
+IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+
+
+def natural_sort_key(path: Path):
+    """파일명을 자연 정렬 (1, 2, 10 순)"""
+    return [
+        int(s) if s.isdigit() else s.lower()
+        for s in re.split(r"(\d+)", path.name)
+    ]
+
+
+def collect_images(path: str) -> list[str]:
+    """파일 또는 디렉토리에서 이미지 경로 목록 반환"""
+    p = Path(path)
+    if p.is_dir():
+        files = sorted(
+            [f for f in p.iterdir() if f.is_file() and f.suffix.lower() in IMAGE_EXTS],
+            key=natural_sort_key,
+        )
+        return [str(f) for f in files]
+    return [str(p)]
 
 
 def merge_images(
@@ -16,7 +39,6 @@ def merge_images(
     horizontal = direction in ("lr", "rl")
 
     if horizontal:
-        # 가로 합치기: 높이를 최대값에 맞춰 비율 리사이즈
         max_height = max(img.height for img in images)
         resized = []
         for img in images:
@@ -39,7 +61,6 @@ def merge_images(
             result.paste(img, (x_offset, 0))
             x_offset += img.width + gap_x
     else:
-        # 세로 합치기: 너비를 최대값에 맞춰 비율 리사이즈
         max_width = max(img.width for img in images)
         resized = []
         for img in images:
@@ -71,7 +92,10 @@ def merge_images(
 
 def main():
     parser = argparse.ArgumentParser(description="이미지를 합쳐주는 스크립트")
-    parser.add_argument("images", nargs="+", help="합칠 이미지 파일들")
+    parser.add_argument(
+        "inputs", nargs="+",
+        help="합칠 이미지 파일 또는 디렉토리 (디렉토리 지정 시 내부 이미지를 자연 정렬하여 사용)",
+    )
     parser.add_argument("-o", "--output", required=True, help="출력 파일 경로")
     parser.add_argument(
         "-d", "--direction",
@@ -84,11 +108,21 @@ def main():
 
     args = parser.parse_args()
 
-    for p in args.images:
-        if not Path(p).exists():
-            parser.error(f"파일을 찾을 수 없습니다 - {p}")
+    image_paths = []
+    for inp in args.inputs:
+        if not Path(inp).exists():
+            parser.error(f"파일을 찾을 수 없습니다 - {inp}")
+        image_paths.extend(collect_images(inp))
 
-    merge_images(args.images, args.output, args.direction, args.gap_x, args.gap_y)
+    if len(image_paths) < 2:
+        parser.error("합칠 이미지가 2개 이상 필요합니다.")
+
+    print(f"합칠 이미지 {len(image_paths)}개:")
+    for p in image_paths:
+        print(f"  {p}")
+
+    Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+    merge_images(image_paths, args.output, args.direction, args.gap_x, args.gap_y)
 
 
 if __name__ == "__main__":
